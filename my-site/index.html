@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xa_CHのMusic</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* --- 修正：四周四色渐变背景，紫色在前 --- */
+        body {
+            background: radial-gradient(circle at center, 
+                #764ba2 0%, 
+                #667eea 30%, 
+                #4ca1af 60%, 
+                #2c3e50 100%);
+            background-size: 150% 150%;
+            animation: moveBg 12s ease-in-out infinite alternate;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Microsoft YaHei", sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        @keyframes moveBg {
+            0% { background-position: center; }
+            100% { background-position: 20% 20%; }
+        }
+
+        .player-card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            padding: 40px;
+            border-radius: 40px;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.4);
+            width: 90%;
+            max-width: 420px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            transition: max-width 0.5s ease;
+        }
+
+        @media (min-width: 850px) {
+            .player-card { max-width: 900px; flex-direction: row; gap: 60px; }
+            .main-player-part { flex: 1; }
+            .playlist-container { flex: 1; }
+        }
+
+        .site-title {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            letter-spacing: 5px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        /* --- 歌曲名字显示 --- */
+        .title-wrapper {
+            height: 3rem;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        #cursor {
+            width: 2px;
+            height: 1.4rem;
+            background-color: #fff;
+            margin-left: 8px;
+            animation: blink 0.8s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* --- 进度条系统 --- */
+        .controls-row {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 20px;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .progress-section { flex: 1; }
+        .progress-container {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            cursor: pointer;
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #fff;
+            border-radius: 5px;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            font-family: monospace;
+            opacity: 0.7;
+        }
+
+        .play-btn {
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .play-btn svg { fill: #2c3e50; width: 20px; height: 20px; }
+
+        /* --- 修正：音乐列表范围与交互 --- */
+        .playlist-container {
+            height: 300px;
+            overflow-y: auto;
+            scrollbar-width: none;
+            padding: 10px 5px; /* 增加内边距 */
+        }
+        .playlist-container::-webkit-scrollbar { display: none; }
+
+        .song-item {
+            padding: 18px 25px; /* 增大点击范围 */
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            border: 1px solid transparent;
+        }
+
+        .song-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .song-item.active {
+            background: #fff;
+            color: #2c3e50;
+            //transform: translateX(0px); /* 选中时向右偏移，避免边缘遮挡感 */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .song-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .no-gradient {
+            /* 确保 Emoji 颜色正常 */
+            font-style: normal;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="player-card">
+        <div class="main-player-part">
+            <div class="site-title">Xa_CHのMusic</div>
+            <div class="title-wrapper">
+                <div id="current-title"></div>
+                <div id="cursor"></div>
+            </div>
+
+            <audio id="audio-engine"></audio>
+
+            <div class="controls-row">
+                <div class="progress-section">
+                    <div class="progress-container" id="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="time-info">
+                        <span id="current-time">00:00</span>
+                        <span id="duration">00:00</span>
+                    </div>
+                </div>
+                <button class="play-btn" id="play-pause-btn">
+                    <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="pause-icon" style="display:none" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="playlist-container" id="playlist-box">
+            <ul class="playlist">
+                <li class="song-item" data-src="music/莫愁乡 - 亞細亞曠世奇才.mp3">
+                    <span class="song-name">莫愁乡 - 亞細亞曠世奇才</span>
+                </li>
+                <li class="song-item" data-src="music/The King - Paper.MAN.mp3">
+                    <span class="song-name">The King - Paper.MAN</span>
+                </li>
+                <li class="song-item" data-src="music/2step - Ed Sheeran.mp3">
+                    <span class="song-name">2step - Ed Sheeran</span>
+                </li>
+                <li class="song-item" data-src="music/反乌托邦（SpuChestnut Remix） - 抵达彼岸Null.mp3">
+                    <span class="song-name">反乌托邦 - 抵达彼岸Null</span>
+                </li>
+                <li class="song-item" data-src="music/精卫（万物终归向海） - 银翼杀手.mp3">
+                    <span class="song-name">精卫 - 银翼杀手</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const audio = document.getElementById('audio-engine');
+        const playBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
+        const currTimeText = document.getElementById('current-time');
+        const durationText = document.getElementById('duration');
+        const titleDisplay = document.getElementById('current-title');
+        const items = Array.from(document.querySelectorAll('.song-item'));
+
+        let currentIndex = -1;
+        let isPlayingMusic = false;
+
+        const phrases = [
+            "万物皆有裂痕，那是光照进来的地方 ✨",
+            "纵有疾风起，人生不言弃 (ง •_•)ง",
+            "与其向往，不如出发 🚀",
+            "答案在路口，不在尽头 🌿",
+            "慢一点，灵魂才跟得上脚步 ☕"
+        ];
+        
+        let phraseIndex = 0, charIndex = 0, isDeleting = false;
+
+        function type() {
+            if (isPlayingMusic) return;
+            const currentPhrase = phrases[phraseIndex];
+            titleDisplay.innerText = currentPhrase.substring(0, charIndex);
+            
+            if (!isDeleting && charIndex < currentPhrase.length) {
+                charIndex++;
+                setTimeout(type, 120);
+            } else if (isDeleting && charIndex > 0) {
+                charIndex--;
+                setTimeout(type, 50);
+            } else if (!isDeleting && charIndex === currentPhrase.length) {
+                isDeleting = true;
+                setTimeout(type, 2000);
+            } else {
+                isDeleting = false;
+                phraseIndex = (phraseIndex + 1) % phrases.length;
+                setTimeout(type, 500);
+            }
+        }
+        type();
+
+        function playSong(index) {
+            isPlayingMusic = true;
+            currentIndex = index;
+            document.getElementById('cursor').style.display = 'none';
+            
+            items.forEach((li, i) => li.classList.toggle('active', i === currentIndex));
+            
+            const selectedItem = items[currentIndex];
+            audio.src = selectedItem.getAttribute('data-src');
+            titleDisplay.innerText = selectedItem.querySelector('.song-name').innerText;
+            
+            audio.play();
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = 'block';
+
+            // 修正滚动遮挡：确保选中项滚动到容器中央
+            selectedItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        items.forEach((li, index) => li.onclick = () => playSong(index));
+
+        playBtn.onclick = () => {
+            if (currentIndex === -1) { playSong(0); return; }
+            audio.paused ? audio.play() : audio.pause();
+            playIcon.style.display = audio.paused ? 'block' : 'none';
+            pauseIcon.style.display = audio.paused ? 'none' : 'block';
+        };
+
+        // 进度条点击
+        progressContainer.onclick = (e) => {
+            if (!audio.duration) return;
+            const rect = progressContainer.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            audio.currentTime = pos * audio.duration;
+        };
+
+        audio.ontimeupdate = () => {
+            if (audio.duration) {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = percent + '%';
+                currTimeText.innerText = formatTime(audio.currentTime);
+            }
+        };
+
+        audio.onloadedmetadata = () => { durationText.innerText = formatTime(audio.duration); };
+        audio.onended = () => playSong((currentIndex + 1) % items.length);
+
+        function formatTime(secs) {
+            let min = Math.floor(secs / 60);
+            let sec = Math.floor(secs % 60);
+            return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
